@@ -5,6 +5,8 @@ import java.io.FileReader;
 import java.io.Reader;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 
@@ -69,29 +71,44 @@ public class InitComments implements CommandLineRunner{
             JsonArray arr = jsonReader.readArray();
             br.close();
             logger.info("### Processing JSON documents: %d".formatted(arr.size()));
-            int counter = 0;
-            AtomicInteger atomicCounter = new AtomicInteger(counter);
+
+        // **********************************************8
 
 
-            //process comment.json jsonarray
-            //each json object in the array is parsed into a document
-            //for each document, insert into collection
+            // Prepare batch insertion
+            List<Document> batch = new ArrayList<>();
+            int batchSize = 10000;  // Define batch size (adjust as necessary)
+            AtomicInteger atomicCounter = new AtomicInteger(0);
+
+            // Process each JSON object
             arr.stream()
                 .map(j -> Document.parse(j.toString()))
-                //replace the default ObjectId "_id" values with values from the "c_id" field
-                //returned modified document "d"
-                //d.put is a void return method, hence we use return d
                 .map(d -> {
-                    d.put("_id", d.getString("c_id")); 
+                    d.put("_id", d.getString("c_id")); // Replace default _id with c_id
                     return d;
                 })
-                //insert every document into "comment" collection
-                .forEach( d -> {
-                    //Batch insert is more efficient
-                    commentsRepository.insertComments(d, collectionName);
-                    System.out.println(atomicCounter.incrementAndGet());  // Prints the incremented counter
+                .forEach(d -> {
+                    batch.add(d);
+                    atomicCounter.incrementAndGet();
+
+                    // Insert batch if the batch size is reached
+                    if (batch.size() >= batchSize) {
+                        commentsRepository.insertCommentsBatch(batch, collectionName);
+                        logger.info("Inserted batch of %d documents.".formatted(batch.size()));
+                        batch.clear();  // Clear the batch after insertion
+                    }
                 });
-            logger.info("### Json processed");
+
+            // Insert any remaining documents in the last batch
+            if (!batch.isEmpty()) {
+                commentsRepository.insertCommentsBatch(batch, collectionName);
+                logger.info("Inserted final batch of %d documents.".formatted(batch.size()));
+            }
+
+
+        // *************************************
+            long count = commentsRepository.countCollection(collectionName);  // Count all documents in the collection
+            logger.info("### %d documents processed".formatted(count));
         }
 
         //creating text index on c_text field
@@ -105,3 +122,60 @@ public class InitComments implements CommandLineRunner{
 
 
 }
+
+//MULTI INSERTION, WORKS!!
+// // Prepare batch insertion
+// List<Document> batch = new ArrayList<>();
+// int batchSize = 10000;  // Define batch size (adjust as necessary)
+// AtomicInteger atomicCounter = new AtomicInteger(0);
+
+// // Process each JSON object
+// arr.stream()
+//     .map(j -> Document.parse(j.toString()))
+//     .map(d -> {
+//         d.put("_id", d.getString("c_id")); // Replace default _id with c_id
+//         return d;
+//     })
+//     .forEach(d -> {
+//         batch.add(d);
+//         atomicCounter.incrementAndGet();
+
+//         // Insert batch if the batch size is reached
+//         if (batch.size() >= batchSize) {
+//             commentsRepository.insertCommentsBatch(batch, collectionName);
+//             logger.info("Inserted batch of %d documents.".formatted(batch.size()));
+//             batch.clear();  // Clear the batch after insertion
+//         }
+//     });
+
+// // Insert any remaining documents in the last batch
+// if (!batch.isEmpty()) {
+//     commentsRepository.insertCommentsBatch(batch, collectionName);
+//     logger.info("Inserted final batch of %d documents.".formatted(batch.size()));
+// }
+
+
+
+//SINNGLE insertion, WORKS!!
+// int counter = 0;
+// AtomicInteger atomicCounter = new AtomicInteger(counter);
+
+
+// //process comment.json jsonarray
+// //each json object in the array is parsed into a document
+// //for each document, insert into collection
+// arr.stream()
+//     .map(j -> Document.parse(j.toString()))
+//     //replace the default ObjectId "_id" values with values from the "c_id" field
+//     //returned modified document "d"
+//     //d.put is a void return method, hence we use return d
+//     .map(d -> {
+//         d.put("_id", d.getString("c_id")); 
+//         return d;
+//     })
+//     //insert every document into "comment" collection
+//     .forEach( d -> {
+//         //Batch insert is more efficient
+//         commentsRepository.insertComments(d, collectionName);
+//         logger.info("Processed %d".formatted(atomicCounter.incrementAndGet()));
+//     });
