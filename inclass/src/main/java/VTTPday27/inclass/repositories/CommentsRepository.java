@@ -16,6 +16,15 @@ public class CommentsRepository {
     private MongoTemplate template;
 
     //text search the mongo collection
+
+    //db.commentCL.createIndex({ c_text: "text" });
+    // db.commentCL.find(
+    //     { $text: { $search: "term1 term2" } },  // Pass your search terms as a space-separated string
+    //     { score: { $meta: "textScore" }, c_text: 1 }  // Include textScore (relevance) and c_text field
+    //   )
+    //   .sort({ score: { $meta: "textScore" } })  // Sort by relevance score
+    //   .limit(10);  // Limit the number of results to 10
+      
     public List<Document> searchComments(String... terms){ //pass any number of String parameters into the method
 
         TextCriteria textCriteria = TextCriteria.forDefaultLanguage() //english is default language
